@@ -752,11 +752,11 @@ class UEAloader(Dataset):
 
 
 class CustomCrypto(Dataset):
-        def __init__(self, args, root_path, data_path='2017-08-17_2024-08-10_BTCUSDT_spot_1h.csv',
-):
+    def __init__(self, args, root_path, data_path='2017-08-17_2024-08-10_BTCUSDT_spot_1h.csv', flag = None):
         self.args = args
         self.root_path = root_path
-        self.data_path = data_path
+        self.flag = flag
+        self.data_path = args.data_path
         self.file_path = os.path.join(self.root_path, self.data_path)
         self.data = pd.read_csv(self.file_path)
         self.seq_len = self.args.seq_len
@@ -788,7 +788,7 @@ class CustomCrypto(Dataset):
         sequence = self.normalized_features[idx:idx+self.seq_len]
         label = self.labels.iloc[idx+self.seq_len-1]  # Label of the last entry
 
-        return torch.FloatTensor(sequence), torch.LongTensor([label]), torch.ones(self.seq_len)  
+        return torch.FloatTensor(sequence), torch.LongTensor([label]) #, torch.ones(self.seq_len)  
 
 
     def inverse_transform(self, normalized_data):
