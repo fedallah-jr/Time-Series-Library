@@ -15,6 +15,34 @@ import pdb
 warnings.filterwarnings('ignore')
 
 
+class CustomLoss(nn.Module):
+    def __init__(self, weight_matrix=None):
+        super(CustomLoss, self).__init__()
+        if weight_matrix is None:
+            # Default weight matrix
+            # Rows represent true labels, columns represent predicted labels
+            self.weight_matrix = torch.tensor([
+                [0.0, 1.0, 2.0],  # True label 0
+                [1.0, 0.0, 1.0],  # True label 1 (neutral)
+                [2.0, 1.0, 0.0]   # True label 2
+            ])
+        else:
+            self.weight_matrix = weight_matrix
+
+    def forward(self, predictions, targets):
+        # Apply softmax to get probabilities
+        probs = F.softmax(predictions, dim=1)
+        
+        # Create one-hot encoding of targets
+        target_one_hot = F.one_hot(targets, num_classes=3).float()
+        
+        # Compute the expected loss for each sample
+        weighted_probs = probs.unsqueeze(1) * self.weight_matrix.to(probs.device)
+        sample_losses = torch.sum(target_one_hot * weighted_probs, dim=(1, 2))
+        
+        # Return mean loss
+        return torch.mean(sample_losses)
+        
 class Exp_Classification(Exp_Basic):
     def __init__(self, args):
         super(Exp_Classification, self).__init__(args)
@@ -43,7 +71,10 @@ class Exp_Classification(Exp_Basic):
         return model_optim
 
     def _select_criterion(self):
-        criterion = nn.CrossEntropyLoss()
+        if args.punisher:
+            criterion = CustomLoss()
+        else:
+            criterion = nn.cross
         return criterion
 
     def vali(self, vali_data, vali_loader, criterion):
