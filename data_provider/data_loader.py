@@ -749,3 +749,55 @@ class UEAloader(Dataset):
 
     def __len__(self):
         return len(self.all_IDs)
+
+
+class CustomCrypro(Dataset):
+    def __init__(self, file_path, seq_len):
+        self.data = pd.read_csv(file_path)
+        self.seq_len = seq_len
+        self.scaler = StandardScaler()
+        
+        # Separate features and labels
+        self.features = self.data.iloc[:, 1:-1]  # Exclude date and label columns
+        self.labels = self.data.iloc[:, -1]
+        
+        # Fit the scaler on the features
+        self.scaler.fit(self.features)
+        
+        # Normalize the features
+        self.normalized_features = self.scaler.transform(self.features)
+
+        # Process labels
+        self.process_labels()
+
+    def process_labels(self):
+        # Convert labels to categories
+        self.label_map = {0: 0, 0.5: 1, 1: 2}
+        self.labels = self.labels.map(self.label_map)
+        self.num_classes = len(self.label_map)
+
+    def __len__(self):
+        return len(self.data) - self.seq_len + 1
+
+    def __getitem__(self, idx):
+        sequence = self.normalized_features[idx:idx+self.seq_len]
+        label = self.labels.iloc[idx+self.seq_len-1]  # Label of the last entry
+
+        return {
+            'features': torch.FloatTensor(sequence),
+            'label': torch.LongTensor([label]),
+            'padding_mask': torch.ones(self.seq_len)  # Assuming no padding is needed
+        }
+
+    def inverse_transform(self, normalized_data):
+        """
+        Method to inverse transform the normalized data back to original scale
+        """
+        return self.scaler.inverse_transform(normalized_data)
+
+    def get_original_label(self, processed_label):
+        """
+        Convert processed label back to original format
+        """
+        inverse_label_map = {v: k for k, v in self.label_map.items()}
+        return inverse_label_map[processed_label]
