@@ -96,6 +96,7 @@ if __name__ == '__main__':
     parser.add_argument('--loss', type=str, default='MSE', help='loss function')
     parser.add_argument('--lradj', type=str, default='type1', help='adjust learning rate')
     parser.add_argument('--use_amp', action='store_true', help='use automatic mixed precision training', default=False)
+    parser.add_argument('--punisher', type=bool, default=False, help='Custom loss function')
 
     # GPU
     parser.add_argument('--use_gpu', type=bool, default=True, help='use gpu')
