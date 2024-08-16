@@ -4,6 +4,8 @@ from utils.tools import EarlyStopping, adjust_learning_rate, cal_accuracy
 import torch
 import torch.nn as nn
 from torch import optim
+import torch_optimizer as optim1
+
 import os
 import time
 import warnings
@@ -21,10 +23,10 @@ class Exp_Classification(Exp_Basic):
         # model input depends on data
         train_data, train_loader = self._get_data(flag='TRAIN')
         test_data, test_loader = self._get_data(flag='TEST')
-        self.args.seq_len = max(train_data.max_seq_len, test_data.max_seq_len)
+        self.args.seq_len = train_data.seq_len
         self.args.pred_len = 0
-        self.args.enc_in = train_data.feature_df.shape[1]
-        self.args.num_class = len(train_data.class_names)
+        self.args.enc_in = train_data.normalized_features.shape[1]
+        self.args.num_class = train_data.num_classes
         # model init
         model = self.model_dict[self.args.model].Model(self.args).float()
         if self.args.use_multi_gpu and self.args.use_gpu:
@@ -37,7 +39,7 @@ class Exp_Classification(Exp_Basic):
 
     def _select_optimizer(self):
         # model_optim = optim.Adam(self.model.parameters(), lr=self.args.learning_rate)
-        model_optim = optim.RAdam(self.model.parameters(), lr=self.args.learning_rate)
+        model_optim = optim1.RAdam(self.model.parameters(), lr=self.args.learning_rate)
         return model_optim
 
     def _select_criterion(self):
@@ -109,7 +111,6 @@ class Exp_Classification(Exp_Basic):
                 label = label.to(self.device)
 
                 outputs = self.model(batch_x, padding_mask, None, None)
-                print(outputs.shape)
                 loss = criterion(outputs, label.long().squeeze(-1))
                 train_loss.append(loss.item())
 
