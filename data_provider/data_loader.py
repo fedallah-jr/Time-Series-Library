@@ -751,7 +751,7 @@ class UEAloader(Dataset):
         return len(self.all_IDs)
 
 
-class CustomCrypro(Dataset):
+class CustomCrypto(Dataset):
     def __init__(self, file_path, seq_len):
         self.data = pd.read_csv(file_path)
         self.seq_len = seq_len
