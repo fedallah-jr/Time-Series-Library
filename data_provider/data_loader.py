@@ -777,8 +777,7 @@ class CustomCrypto(Dataset):
         # Set up data splits
         self.set_up_splits(flag)
 
-        # Print dataset sizes
-        self.print_dataset_sizes()
+
 
     def set_up_splits(self, flag):
         # Calculate split sizes
