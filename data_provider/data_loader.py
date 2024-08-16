@@ -783,11 +783,8 @@ class CustomCrypro(Dataset):
         sequence = self.normalized_features[idx:idx+self.seq_len]
         label = self.labels.iloc[idx+self.seq_len-1]  # Label of the last entry
 
-        return {
-            'features': torch.FloatTensor(sequence),
-            'label': torch.LongTensor([label]),
-            'padding_mask': torch.ones(self.seq_len)  # Assuming no padding is needed
-        }
+        return torch.FloatTensor(sequence), torch.LongTensor([label]), torch.ones(self.seq_len)  
+
 
     def inverse_transform(self, normalized_data):
         """
