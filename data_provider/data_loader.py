@@ -752,9 +752,14 @@ class UEAloader(Dataset):
 
 
 class CustomCrypto(Dataset):
-    def __init__(self, file_path, seq_len):
-        self.data = pd.read_csv(file_path)
-        self.seq_len = seq_len
+        def __init__(self, args, root_path, data_path='2017-08-17_2024-08-10_BTCUSDT_spot_1h.csv',
+):
+        self.args = args
+        self.root_path = root_path
+        self.data_path = data_path
+        self.file_path = os.path.join(self.root_path, self.data_path)
+        self.data = pd.read_csv(self.file_path)
+        self.seq_len = self.args.seq_len
         self.scaler = StandardScaler()
         
         # Separate features and labels
