@@ -6,7 +6,6 @@ import torch.nn as nn
 from torch import optim
 import torch_optimizer as optim1
 import torch.nn.functional as F 
-
 import os
 import time
 import warnings
@@ -38,8 +37,8 @@ class CustomLoss(nn.Module):
         target_one_hot = F.one_hot(targets, num_classes=3).float()
         
         # Compute the expected loss for each sample
-        weighted_probs = probs.unsqueeze(1) * self.weight_matrix.to(probs.device)
-        sample_losses = torch.sum(target_one_hot * weighted_probs, dim=(1, 2))
+        weighted_probs = torch.matmul(probs, self.weight_matrix.to(probs.device))
+        sample_losses = torch.sum(target_one_hot * weighted_probs, dim=1)
         
         # Return mean loss
         return torch.mean(sample_losses)
@@ -72,10 +71,10 @@ class Exp_Classification(Exp_Basic):
         return model_optim
 
     def _select_criterion(self):
-        if args.punisher:
+        if self.args.punisher:
             criterion = CustomLoss()
         else:
-            criterion = nn.cross
+            criterion = nn.CrossEntropyLoss()
         return criterion
 
     def vali(self, vali_data, vali_loader, criterion):
