@@ -46,11 +46,11 @@ class CustomLoss(nn.Module):
 class Exp_Classification(Exp_Basic):
     def __init__(self, args):
         super(Exp_Classification, self).__init__(args)
-
     def _build_model(self):
         # model input depends on data
         train_data, train_loader = self._get_data(flag='TRAIN')
         test_data, test_loader = self._get_data(flag='TEST')
+        val_data, val_loader = self._get_data(flag='VAL')
         self.args.seq_len = train_data.seq_len
         self.args.pred_len = 0
         self.args.enc_in = train_data.normalized_features.shape[1]
@@ -71,9 +71,11 @@ class Exp_Classification(Exp_Basic):
         return model_optim
 
     def _select_criterion(self):
-        if self.args.punisher:
+        if False:
+            print("Using custom loss")
             criterion = CustomLoss()
         else:
+            print("Using Cross Entropy Loss")
             criterion = nn.CrossEntropyLoss()
         return criterion
 
@@ -111,7 +113,7 @@ class Exp_Classification(Exp_Basic):
 
     def train(self, setting):
         train_data, train_loader = self._get_data(flag='TRAIN')
-        vali_data, vali_loader = self._get_data(flag='TEST')
+        vali_data, vali_loader = self._get_data(flag='VAL')
         test_data, test_loader = self._get_data(flag='TEST')
 
         path = os.path.join(self.args.checkpoints, setting)
