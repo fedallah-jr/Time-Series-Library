@@ -752,14 +752,13 @@ class UEAloader(Dataset):
 
 
 class CustomCrypto(Dataset):
-    def __init__(self, args, root_path, data_path='2017-08-17_2024-08-10_BTCUSDT_spot_1h.csv', flag = None):
+    def __init__(self, args, root_path, data_path='2017-08-17_2024-08-10_BTCUSDT_spot_1h.csv', flag='train'):
         self.args = args
         self.root_path = root_path
-        self.flag = flag
-        self.data_path = args.data_path
+        self.data_path = data_path
         self.file_path = os.path.join(self.root_path, self.data_path)
         self.data = pd.read_csv(self.file_path)
-        self.seq_len = self.args.seq_len
+        self.seq_len = args.seq_len
         self.scaler = StandardScaler()
         
         # Separate features and labels
@@ -775,6 +774,38 @@ class CustomCrypto(Dataset):
         # Process labels
         self.process_labels()
 
+        # Set up data splits
+        self.set_up_splits(flag)
+
+        # Print dataset sizes
+        self.print_dataset_sizes()
+
+    def set_up_splits(self, flag):
+        # Calculate split sizes
+        data_len = len(self.data)
+        train_len = int(data_len * 0.8)
+        val_len = int(data_len * 0.1)
+        test_len = data_len - train_len - val_len
+
+        # Define borders for each split
+        border1s = [0, train_len - self.seq_len, train_len + val_len - self.seq_len]
+        border2s = [train_len, train_len + val_len, data_len]
+        
+        # Set up split type
+        self.set_type = {'train': 0, 'val': 1, 'test': 2}[flag]
+        
+        self.border1 = border1s[self.set_type]
+        self.border2 = border2s[self.set_type]
+
+    def print_dataset_sizes(self):
+        train_size = int(len(self.data) * 0.8) - self.seq_len + 1
+        val_size = int(len(self.data) * 0.1) - self.seq_len + 1
+        test_size = len(self.data) - int(len(self.data) * 0.9) - self.seq_len + 1
+        
+        print(f"Train dataset size: {train_size}")
+        print(f"Validation dataset size: {val_size}")
+        print(f"Test dataset size: {test_size}")
+
     def process_labels(self):
         # Convert labels to categories
         self.label_map = {0: 0, 0.5: 1, 1: 2}
@@ -782,14 +813,14 @@ class CustomCrypto(Dataset):
         self.num_classes = len(self.label_map)
 
     def __len__(self):
-        return len(self.data) - self.seq_len + 1
+        return self.border2 - self.border1
 
     def __getitem__(self, idx):
-        sequence = self.normalized_features[idx:idx+self.seq_len]
-        label = self.labels.iloc[idx+self.seq_len-1]  # Label of the last entry
+        real_idx = self.border1 + idx
+        sequence = self.normalized_features[real_idx:real_idx+self.seq_len]
+        label = self.labels.iloc[real_idx+self.seq_len-1]  # Label of the last entry
 
-        return torch.FloatTensor(sequence), torch.LongTensor([label]) #, torch.ones(self.seq_len)  
-
+        return torch.FloatTensor(sequence), torch.LongTensor([label])
 
     def inverse_transform(self, normalized_data):
         """
