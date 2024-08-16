@@ -777,7 +777,8 @@ class CustomCrypto(Dataset):
         # Set up data splits
         self.set_up_splits(flag)
 
-
+        # Print dataset sizes
+        self.print_dataset_sizes()
 
     def set_up_splits(self, flag):
         # Calculate split sizes
@@ -812,9 +813,12 @@ class CustomCrypto(Dataset):
         self.num_classes = len(self.label_map)
 
     def __len__(self):
-        return self.border2 - self.border1
+        return max(0, self.border2 - self.border1 - self.seq_len + 1)
 
     def __getitem__(self, idx):
+        if idx < 0 or idx >= len(self):
+            raise IndexError(f"Index {idx} is out of bounds for dataset of length {len(self)}")
+        
         real_idx = self.border1 + idx
         sequence = self.normalized_features[real_idx:real_idx+self.seq_len]
         label = self.labels.iloc[real_idx+self.seq_len-1]  # Label of the last entry
