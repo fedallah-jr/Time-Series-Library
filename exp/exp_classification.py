@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 from torch import optim
 import torch_optimizer as optim1
+import torch.nn.functional as F 
 
 import os
 import time
