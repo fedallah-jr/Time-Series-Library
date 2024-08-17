@@ -863,7 +863,7 @@ class ZigZagCrypto(Dataset):
             if file_name.endswith('.csv') and (file_name.startswith('train_') or file_name.startswith('test_')):
                 file_path = os.path.join(self.root_path, file_name)
                 symbol = file_name.split('_')[1]  # Assuming file name format is train_SYMBOL.csv or test_SYMBOL.csv
-                split_type = 'train' if file_name.startswith('train_') else 'test'
+                split_type = 'TRAIN' if file_name.startswith('train_') else 'TEST'
                 if symbol not in data:
                     data[symbol] = {}
                 data[symbol][split_type] = pd.read_csv(file_path)
@@ -902,9 +902,9 @@ class ZigZagCrypto(Dataset):
         self.data_indices = []
         for symbol, split_data in self.labeled_indices.items():
             if self.flag.upper() == 'TRAIN':
-                indices = split_data['train']
+                indices = split_data['TRAIN']
             elif self.flag.upper() in ['VAL', 'TEST']:
-                indices = split_data['test']
+                indices = split_data['TEST']
             
             self.data_indices.extend([(symbol, idx, self.flag.lower()) for idx in indices])
 
