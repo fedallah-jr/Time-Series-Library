@@ -847,7 +847,6 @@ class ZigZagCrypto(Dataset):
         self.flag = flag
         
         self.data = self.load_data()
-        self.scaler = StandardScaler()
         
         # Process features and labels
         self.process_data()
@@ -861,41 +860,38 @@ class ZigZagCrypto(Dataset):
     def load_data(self):
         data = {}
         for file_name in os.listdir(self.root_path):
-            if file_name.endswith('.csv'):
+            if file_name.endswith('.csv') and (file_name.startswith('train_') or file_name.startswith('test_')):
                 file_path = os.path.join(self.root_path, file_name)
-                symbol = file_name.split('_')[0]  # Assuming file name format is SYMBOL_*.csv
-                data[symbol] = pd.read_csv(file_path)
+                symbol = file_name.split('_')[1]  # Assuming file name format is train_SYMBOL.csv or test_SYMBOL.csv
+                split_type = 'train' if file_name.startswith('train_') else 'test'
+                if symbol not in data:
+                    data[symbol] = {}
+                data[symbol][split_type] = pd.read_csv(file_path)
         return data
         
     def process_data(self):
         self.processed_data = {}
-        self.labeled_indices = defaultdict(list)
+        self.labeled_indices = defaultdict(lambda: defaultdict(list))
         
-        for symbol, df in self.data.items():
-            # Separate features and labels
-            features = df.iloc[:, 1:-1]  # Exclude date and label columns
-            labels = df.iloc[:, -1]
-            self.features = features
-            self.labels = labels
-
-            # Fit the scaler on the features
-            self.scaler.fit(features)
-            
-            # Normalize the features
-            normalized_features = self.scaler.transform(features)
-            
-            # Process labels
-            processed_labels = self.process_labels(labels)
-            
-            # Get indices of labeled points
-            labeled_indices = processed_labels[processed_labels != -1].index.tolist()
-            
-            self.processed_data[symbol] = {
-                'features': normalized_features,
-                'labels': processed_labels,
-                'original_index': df.index
-            }
-            self.labeled_indices[symbol] = labeled_indices
+        for symbol, split_data in self.data.items():
+            self.processed_data[symbol] = {}
+            for split_type, df in split_data.items():
+                # Separate features and labels
+                features = df.iloc[:, 1:-1].values  # Exclude date and label columns, convert to numpy array
+                labels = df.iloc[:, -1]
+                
+                # Process labels
+                processed_labels = self.process_labels(labels)
+                
+                # Get indices of labeled points
+                labeled_indices = processed_labels[processed_labels != -1].index.tolist()
+                
+                self.processed_data[symbol][split_type] = {
+                    'features': features,
+                    'labels': processed_labels,
+                    'original_index': df.index
+                }
+                self.labeled_indices[symbol][split_type] = labeled_indices
 
     def process_labels(self, labels):
         # Convert labels to categories
@@ -904,19 +900,13 @@ class ZigZagCrypto(Dataset):
 
     def set_up_splits(self):
         self.data_indices = []
-        for symbol, indices in self.labeled_indices.items():
-            data_len = len(indices)
-            train_len = int(data_len * 0.8)
-            val_len = int(data_len * 0.1)
+        for symbol, split_data in self.labeled_indices.items():
+            if self.flag.upper() == 'TRAIN':
+                indices = split_data['train']
+            elif self.flag.upper() in ['VAL', 'TEST']:
+                indices = split_data['test']
             
-            if self.flag == 'TRAIN':
-                split_indices = indices[:train_len]
-            elif self.flag == 'VAL':
-                split_indices = indices[train_len:train_len+val_len]
-            elif self.flag == 'TEST':
-                split_indices = indices[train_len+val_len:]
-            
-            self.data_indices.extend([(symbol, idx) for idx in split_indices])
+            self.data_indices.extend([(symbol, idx, self.flag.lower()) for idx in indices])
 
     def print_dataset_sizes(self):
         print(f"{self.flag} dataset size: {len(self.data_indices)}")
@@ -925,8 +915,8 @@ class ZigZagCrypto(Dataset):
         return len(self.data_indices)
 
     def __getitem__(self, idx):
-        symbol, real_idx = self.data_indices[idx]
-        data = self.processed_data[symbol]
+        symbol, real_idx, split_type = self.data_indices[idx]
+        data = self.processed_data[symbol][split_type]
         
         # Find the start index for the sequence
         start_idx = max(0, real_idx - self.seq_len + 1)
@@ -934,19 +924,14 @@ class ZigZagCrypto(Dataset):
         # Get the sequence
         sequence = data['features'][start_idx:real_idx+1]
         
-        # If we don't have enough data points, ignore this sample
+        # Apply zero padding if the sequence is shorter than seq_len
         if len(sequence) < self.seq_len:
-            return None
+            padding = np.zeros((self.seq_len - len(sequence), sequence.shape[1]))
+            sequence = np.vstack((padding, sequence))
         
         label = data['labels'].iloc[real_idx]
         
         return torch.FloatTensor(sequence), torch.LongTensor([label])
-
-    def inverse_transform(self, normalized_data):
-        """
-        Method to inverse transform the normalized data back to original scale
-        """
-        return self.scaler.inverse_transform(normalized_data)
 
     def get_original_label(self, processed_label):
         """
@@ -956,6 +941,5 @@ class ZigZagCrypto(Dataset):
         return inverse_label_map[processed_label]
 
     def collate_fn(self, batch):
-        # Filter out None values (sequences that were too short)
-        batch = list(filter(lambda x: x is not None, batch))
+        # No need to filter out None values anymore
         return torch.utils.data.dataloader.default_collate(batch)
