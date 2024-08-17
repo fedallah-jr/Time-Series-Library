@@ -50,7 +50,7 @@ class Exp_Classification(Exp_Basic):
         # model input depends on data
         train_data, train_loader = self._get_data(flag='TRAIN')
         test_data, test_loader = self._get_data(flag='TEST')
-        val_data, val_loader = self._get_data(flag='VAL')
+        val_data, val_loader = self._get_data(flag='TEST')
         self.args.seq_len = train_data.seq_len
         self.args.pred_len = 0
         self.args.enc_in = train_data.normalized_features.shape[1]
