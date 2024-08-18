@@ -841,72 +841,71 @@ class CustomCrypto(Dataset):
 class ZigZagCrypto(Dataset):
     def __init__(self, args, root_path, data_path='', flag='train'):
         self.args = args
-        self.root_path = args.root_path
-        self.data_path = args.data_path
+        self.root_path = root_path
+        self.data_path = data_path
         self.seq_len = args.seq_len
         self.flag = flag
-        
+
         self.data = self.load_data()
-        
+
         # Process features and labels
         self.process_data()
-        
+
         # Set up data splits
         self.set_up_splits()
-        
+
         # Print dataset sizes
         self.print_dataset_sizes()
 
     def load_data(self):
         data = {}
-        for file_name in os.listdir(self.root_path):
-            if file_name.endswith('.csv') and (file_name.startswith('train_') or file_name.startswith('test_')):
-                file_path = os.path.join(self.root_path, file_name)
-                symbol = file_name.split('_')[1]  # Assuming file name format is train_SYMBOL.csv or test_SYMBOL.csv
-                split_type = 'TRAIN' if file_name.startswith('train_') else 'TEST'
-                if symbol not in data:
-                    data[symbol] = {}
-                data[symbol][split_type] = pd.read_csv(file_path)
-        return data
+        file_names = {
+            'TRAIN': 'train.csv',
+            'TEST': 'test.csv'
+        }
         
+        for split_type, file_name in file_names.items():
+            file_path = os.path.join(self.root_path, file_name)
+            if os.path.exists(file_path):
+                data[split_type] = pd.read_csv(file_path)
+            else:
+                raise FileNotFoundError(f"File not found: {file_path}")
+        
+        return data
+
     def process_data(self):
         self.processed_data = {}
-        self.labeled_indices = defaultdict(lambda: defaultdict(list))
-        
-        for symbol, split_data in self.data.items():
-            self.processed_data[symbol] = {}
-            for split_type, df in split_data.items():
-                # Separate features and labels
-                features = df.iloc[:, 1:-1].values  # Exclude date and label columns, convert to numpy array
-                labels = df.iloc[:, -1]
-                
-                # Process labels
-                processed_labels = self.process_labels(labels)
-                
-                # Get indices of labeled points
-                labeled_indices = processed_labels[processed_labels != -1].index.tolist()
-                
-                self.processed_data[symbol][split_type] = {
-                    'features': features,
-                    'labels': processed_labels,
-                    'original_index': df.index
-                }
-                self.labeled_indices[symbol][split_type] = labeled_indices
+        self.labeled_indices = {}
+
+        for split_type, df in self.data.items():
+            # Separate features and labels
+            features = df.iloc[:, 1:-1].values  # Exclude date and label columns, convert to numpy array
+            labels = df.iloc[:, -1]
+            self.normalized_features = features
+            # Process labels
+            processed_labels = self.process_labels(labels)
+
+            # Get indices of labeled points
+            labeled_indices = processed_labels[processed_labels != -1].index.tolist()
+
+            self.processed_data[split_type] = {
+                'features': features,
+                'labels': processed_labels,
+                'original_index': df.index
+            }
+            self.labeled_indices[split_type] = labeled_indices
 
     def process_labels(self, labels):
         # Convert labels to categories
         label_map = {-1: -1, 0: 0, 1: 1}  # -1 for unlabeled, 0 for peak, 1 for bottom
+        self.num_classes = 2
         return labels.map(label_map)
 
     def set_up_splits(self):
         self.data_indices = []
-        for symbol, split_data in self.labeled_indices.items():
-            if self.flag.upper() == 'TRAIN':
-                indices = split_data['TRAIN']
-            elif self.flag.upper() in ['VAL', 'TEST']:
-                indices = split_data['TEST']
-            
-            self.data_indices.extend([(symbol, idx, self.flag.lower()) for idx in indices])
+        split_type = 'TRAIN' if self.flag.upper() == 'TRAIN' else 'TEST'
+        
+        self.data_indices = [(idx, self.flag.lower()) for idx in self.labeled_indices[split_type]]
 
     def print_dataset_sizes(self):
         print(f"{self.flag} dataset size: {len(self.data_indices)}")
@@ -915,22 +914,22 @@ class ZigZagCrypto(Dataset):
         return len(self.data_indices)
 
     def __getitem__(self, idx):
-        symbol, real_idx, split_type = self.data_indices[idx]
-        data = self.processed_data[symbol][split_type]
-        
+        real_idx, split_type = self.data_indices[idx]
+        data = self.processed_data[split_type.upper()]
+
         # Find the start index for the sequence
         start_idx = max(0, real_idx - self.seq_len + 1)
-        
+
         # Get the sequence
         sequence = data['features'][start_idx:real_idx+1]
-        
+
         # Apply zero padding if the sequence is shorter than seq_len
         if len(sequence) < self.seq_len:
             padding = np.zeros((self.seq_len - len(sequence), sequence.shape[1]))
             sequence = np.vstack((padding, sequence))
-        
+
         label = data['labels'].iloc[real_idx]
-        
+
         return torch.FloatTensor(sequence), torch.LongTensor([label])
 
     def get_original_label(self, processed_label):
@@ -941,5 +940,4 @@ class ZigZagCrypto(Dataset):
         return inverse_label_map[processed_label]
 
     def collate_fn(self, batch):
-        # No need to filter out None values anymore
         return torch.utils.data.dataloader.default_collate(batch)
